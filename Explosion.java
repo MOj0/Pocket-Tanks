@@ -25,12 +25,12 @@ public class Explosion
 		return true;
 	}
 	
-	public boolean checkCollision(int[] tankPos, int tankSize)
+	public boolean checkCollision(int tankX, int tankY, int tankSize)
 	{
 		if(!hit)
 		{
-			int deltaX = position[0] - tankPos[0];
-			int deltaY = position[1] - tankPos[1];
+			int deltaX = position[0] + size / 2 - tankX;
+			int deltaY = position[1] + size / 2 - tankY;
 			int distance = (int) Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 			distance = distance - size / 2 - tankSize / 2;
 			if(distance < 0)

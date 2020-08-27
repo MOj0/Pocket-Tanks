@@ -45,7 +45,7 @@ public class Tank
 	public void setIndex(int i)
 	{
 		index = i;
-		// hasMoved = true; //TODO UNCOMMENT THIS
+		hasMoved = true;
 	}
 	
 	public void setMoved(boolean m)

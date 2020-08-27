@@ -147,11 +147,12 @@ public class PocketTanks implements Runnable
 		if(explosion != null)
 		{
 			int index = (turn + 1) % 2;
-			boolean collision = explosion.checkCollision(tanks[index].getPosition(), tanks[index].getSize());
+			boolean collision = explosion.checkCollision(tanks[index].getPosition()[0] + tanks[index].getSize() / 2,
+					tanks[index].getPosition()[1] + tanks[index].getSize() / 2, tanks[index].getSize());
 			
 			if(collision)
 			{
-				tanks[index].dealDamage(1); // TODO CHANGE TO 25
+				tanks[index].dealDamage(25);
 				if(!tanks[index].isAlive())
 				{
 					gameState = turn + 1;
@@ -173,14 +174,8 @@ public class PocketTanks implements Runnable
 			int collide = bullet.checkCollision(quotient, terrain);
 			if(collide != -1)
 			{
-				explosion = new Explosion(new int[] {collide * quotient - 15 * 3, terrain[collide] - 15 * 3}, 30 * 3,
-						50);
+				explosion = new Explosion(new int[] {collide * quotient - 30, terrain[collide] - 30}, 60, 50);
 				
-				// TODO DELETE LATER
-//				if(collide == tanks[(turn + 1) % 2].getIndex())
-//				{
-//					
-//				}
 				bullet = null;
 			}
 		}
@@ -201,8 +196,7 @@ public class PocketTanks implements Runnable
 			g.setFont(arial);
 			
 			// 1st Button
-			g.setColor(new Color(64, 64, 64, 255));
-			g.fillRect(WIDTH / 2 - rectWidth / 2, 200, rectWidth, rectHeight);
+			g.drawRect(WIDTH / 2 - rectWidth / 2, 200, rectWidth, rectHeight);
 			g.setColor(Color.white);
 			g.drawString("Play against PC", WIDTH / 2 - 80, rectStartY + rectHeight / 2);
 			
@@ -276,9 +270,8 @@ public class PocketTanks implements Runnable
 					g2d.rotate(tanks[i].getAngle() * Math.PI / 180, rect.x + 5, rect.y + 5);
 					g2d.fill(rect);
 					
-					// TODO FIXX!
-//					tankPosition[0] += drawDelta;
-//					tankPosition[1] += drawDelta;
+					tankPosition[0] += drawDelta;
+					tankPosition[1] += drawDelta;
 					// Display player name (above the tank)
 					fontWidth = g.getFontMetrics(arial).stringWidth(tanks[i].getName());
 					g.drawString(tanks[i].getName(), tankPosition[0] - fontWidth / 2,
@@ -560,11 +553,8 @@ public class PocketTanks implements Runnable
 					{
 						if(y >= rectStartY + rectDeltaY * i && y <= rectStartY + rectDeltaY * i + rectHeight)
 						{
-							if(i != 0) // TODO When you implement Bot, remove this
-							{
-								menu = i + 1;
-								break;
-							}
+							menu = i + 1;
+							break;
 						}
 					}
 				}
