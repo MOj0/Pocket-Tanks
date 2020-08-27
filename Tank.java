@@ -8,6 +8,7 @@ public class Tank
 	private int angle;
 	private int power;
 	private boolean hasMoved;
+	private int[] position;
 	
 	public Tank(String n, int i, int h, int s)
 	{
@@ -18,6 +19,7 @@ public class Tank
 		angle = 0;
 		power = 50;
 		hasMoved = false;
+		position = new int[2];
 	}
 	
 	public boolean isAlive()
@@ -54,6 +56,16 @@ public class Tank
 	public void setHealth(int h)
 	{
 		health = h;
+	}
+	
+	public void setPosition(int[] p)
+	{
+		position = p;
+	}
+	
+	public int[] getPosition()
+	{
+		return position;
 	}
 	
 	public String getName()

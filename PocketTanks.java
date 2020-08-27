@@ -19,6 +19,7 @@ public class PocketTanks implements Runnable
 	private boolean gameStarted;
 	private int gameState;
 	private int turn;
+	private int drawDelta;
 	// menu
 	private int rectWidth;
 	private int rectHeight;
@@ -67,6 +68,7 @@ public class PocketTanks implements Runnable
 		rectDeltaY = 150;
 		pPoints = new int[2][2];
 		hitText = false;
+		drawDelta = 10;
 		
 		stars = new int[15][2];
 		for(int i = 0; i < stars.length; i++)
@@ -144,8 +146,18 @@ public class PocketTanks implements Runnable
 	{
 		if(explosion != null)
 		{
-			int index = tanks[(turn + 1) % 2].getIndex();
-			int[] tankPos = {index * quotient, terrain[index]};
+			int index = (turn + 1) % 2;
+			boolean collision = explosion.checkCollision(tanks[index].getPosition(), tanks[index].getSize());
+			
+			if(collision)
+			{
+				tanks[index].dealDamage(1); // TODO CHANGE TO 25
+				if(!tanks[index].isAlive())
+				{
+					gameState = turn + 1;
+				}
+				hitText = true;
+			}
 			
 			if(!explosion.update())
 			{
@@ -161,18 +173,14 @@ public class PocketTanks implements Runnable
 			int collide = bullet.checkCollision(quotient, terrain);
 			if(collide != -1)
 			{
-				explosion = new Explosion(new int[] {collide * quotient - 15, terrain[collide] - 15}, 30, 50);
+				explosion = new Explosion(new int[] {collide * quotient - 15 * 3, terrain[collide] - 15 * 3}, 30 * 3,
+						50);
 				
-				if(collide == tanks[(turn + 1) % 2].getIndex())
-				{
-					tanks[(turn + 1) % 2].dealDamage(25);
-					if(!tanks[(turn + 1) % 2].isAlive())
-					{
-						gameState = turn + 1;
-					}
-					hitText = true;
-				}
-				
+				// TODO DELETE LATER
+//				if(collide == tanks[(turn + 1) % 2].getIndex())
+//				{
+//					
+//				}
 				bullet = null;
 			}
 		}
@@ -254,22 +262,28 @@ public class PocketTanks implements Runnable
 					}
 					
 					int index = tanks[i].getIndex();
-					int[] drawPoints = {lerp(pPoints[i][0], index * quotient, 0.4),
-							lerp(pPoints[i][1], terrain[index], 0.4)};
-					g.fillOval(drawPoints[0] - 10, drawPoints[1] - 10, tanks[i].getSize(), tanks[i].getSize());
+					int[] tankPosition = {lerp(pPoints[i][0], index * quotient, 0.4) - drawDelta,
+							lerp(pPoints[i][1], terrain[index], 0.4) - drawDelta};
+					tanks[i].setPosition(tankPosition);
+					// Draw current tank
+					g.fillOval(tankPosition[0], tankPosition[1], tanks[i].getSize(), tanks[i].getSize());
 					
 					// Draw canon
 					Graphics2D g2d = (Graphics2D) g.create(); // with g.create() method we have 2 different object,
 																// which are SEPERATE!!!
-					Rectangle rect = new Rectangle(drawPoints[0] - 5, drawPoints[1] - 5, 30, 10);
+					Rectangle rect = new Rectangle(tankPosition[0] + drawDelta / 2, tankPosition[1] + drawDelta / 2, 30,
+							10);
 					g2d.rotate(tanks[i].getAngle() * Math.PI / 180, rect.x + 5, rect.y + 5);
 					g2d.fill(rect);
 					
+					// TODO FIXX!
+//					tankPosition[0] += drawDelta;
+//					tankPosition[1] += drawDelta;
 					// Display player name (above the tank)
 					fontWidth = g.getFontMetrics(arial).stringWidth(tanks[i].getName());
-					g.drawString(tanks[i].getName(), drawPoints[0] - fontWidth / 2,
-							drawPoints[1] - g.getFontMetrics(arial).getHeight() - 10);
-					pPoints[i] = drawPoints;
+					g.drawString(tanks[i].getName(), tankPosition[0] - fontWidth / 2,
+							tankPosition[1] - g.getFontMetrics(arial).getHeight() - drawDelta);
+					pPoints[i] = tankPosition;
 					
 					int fontWidthHealth = g.getFontMetrics(arial).stringWidth("Health: " + tanks[i].getHealth());
 					fontWidth = Math.max(fontWidth, fontWidthHealth);
