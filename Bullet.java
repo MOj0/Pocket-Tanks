@@ -30,9 +30,9 @@ public class Bullet
 	
 	public int checkCollision(int quotient, int[] terrain)
 	{
-		if(position[1] > PocketTanks.HEIGHT) // Bullet is off screen
+		if(position[0] < 0 || position[1] > PocketTanks.HEIGHT) // Bullet is off screen
 		{
-			return PocketTanks.numberOfPoints + 1; // Nobody can collide at this point
+			return PocketTanks.numberOfPoints + 10; // Nobody can collide at this point
 		}
 		
 		for(int i = 1; i < terrain.length; i++)

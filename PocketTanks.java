@@ -1,9 +1,13 @@
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.io.File;
 
 public class PocketTanks implements Runnable
 {
@@ -175,7 +179,7 @@ public class PocketTanks implements Runnable
 			if(collide != -1)
 			{
 				explosion = new Explosion(new int[] {collide * quotient - 30, terrain[collide] - 30}, 60, 50);
-				
+				playSound("sounds/explosion.wav"); // plays explosion sound
 				bullet = null;
 			}
 		}
@@ -453,6 +457,7 @@ public class PocketTanks implements Runnable
 	{
 		if(explosion == null)
 		{
+			playSound("sounds/shoot.wav");
 			Tank currentTank = tanks[turn];
 			return new Bullet(turn, new int[] {currentTank.getIndex() * quotient, terrain[currentTank.getIndex()] - 10},
 					currentTank.getAngle(), currentTank.getPower());
@@ -509,6 +514,22 @@ public class PocketTanks implements Runnable
 				spawn = (int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3);
 			}
 			tanks[i] = new Tank(tankName, spawn, 100, 20);
+		}
+	}
+	
+	public void playSound(String sound)
+	{
+		try
+		{
+			File musicPath = new File(sound);
+			AudioInputStream audioInput = AudioSystem.getAudioInputStream(musicPath);
+			Clip clip = AudioSystem.getClip();
+			clip.open(audioInput);
+			clip.start();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
 		}
 	}
 	
