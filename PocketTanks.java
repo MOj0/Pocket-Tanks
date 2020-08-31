@@ -201,9 +201,9 @@ public class PocketTanks implements Runnable
 		{
 			// TODO
 		}
-		else if(menu == 2)
+		else if(!gameStarted)
 		{
-			if(!gameStarted)
+			if(menu == 2) // PvP Game
 			{
 				g.setColor(Color.white);
 				
@@ -216,177 +216,7 @@ public class PocketTanks implements Runnable
 				g.drawRect(WIDTH / 2 - 50, 500, 100, 75);
 				g.drawString("OK", WIDTH / 2 - 20, 545);
 			}
-			else if(gameState == 0)
-			{
-				g.setFont(arial);
-				g.setColor(Color.white);
-				// Draw stars
-				for(int i = 0; i < stars.length; i++)
-				{
-					g.fillOval(stars[i][0], stars[i][1], 5, 5);
-				}
-				
-				// Draw terrain
-				for(int i = 0; i < numberOfPoints - 1; i++)
-				{
-					g.drawLine(i * quotient, terrain[i], (i + 1) * quotient, terrain[i + 1]);
-				}
-				
-				// Draw tanks, SHIT CAN MOVE THROUGH MOUNTAINS LMAO!!!
-				for(int i = 0; i < tanks.length; i++)
-				{
-					if(i == 0)
-					{
-						g.setColor(Color.green.darker());
-					}
-					else
-					{
-						g.setColor(Color.red.darker());
-					}
-					
-					int index = tanks[i].getIndex();
-					int[] tankPosition = {lerp(pPoints[i][0], index * quotient, 0.4) - drawDelta,
-							lerp(pPoints[i][1], terrain[index], 0.4) - drawDelta};
-					tanks[i].setPosition(tankPosition);
-					// Draw current tank
-					g.fillOval(tankPosition[0], tankPosition[1], tanks[i].getSize(), tanks[i].getSize());
-					
-					// Draw canon
-					Graphics2D g2d = (Graphics2D) g.create(); // with g.create() method we have 2 different object,
-																// which are SEPERATE!!!
-					Rectangle rect = new Rectangle(tankPosition[0] + drawDelta / 2, tankPosition[1] + drawDelta / 2, 30,
-							10);
-					g2d.rotate(tanks[i].getAngle() * Math.PI / 180, rect.x + 5, rect.y + 5);
-					g2d.fill(rect);
-					
-					tankPosition[0] += drawDelta;
-					tankPosition[1] += drawDelta;
-					// Display player name (above the tank)
-					fontWidth = g.getFontMetrics(arial).stringWidth(tanks[i].getName());
-					g.drawString(tanks[i].getName(), tankPosition[0] - fontWidth / 2,
-							tankPosition[1] - g.getFontMetrics(arial).getHeight() - drawDelta);
-					pPoints[i] = tankPosition;
-					
-					int fontWidthHealth = g.getFontMetrics(arial).stringWidth("Health: " + tanks[i].getHealth());
-					fontWidth = Math.max(fontWidth, fontWidthHealth);
-					if(i == 0)
-					{
-						g.drawString(tanks[i].getName() + ":", 30, 40);
-						g.drawString("Health: " + tanks[i].getHealth(), 30, 65);
-					}
-					else
-					{
-						g.drawString(tanks[i].getName() + ":", WIDTH - fontWidth - 30, 40);
-						g.drawString("Health: " + tanks[i].getHealth(), WIDTH - fontWidth - 30, 65);
-					}
-				}
-				
-				// Draw bullet
-				if(bullet != null)
-				{
-					if(bullet.getTeam() == 0)
-					{
-						g.setColor(Color.green.darker());
-					}
-					else
-					{
-						g.setColor(Color.red.darker());
-					}
-					g.fillOval(bullet.getPosition()[0], bullet.getPosition()[1], bullet.getSize(), bullet.getSize());
-				}
-				
-				// Draw explosion
-				if(explosion != null)
-				{
-					g.setColor(Color.orange);
-					g.fillOval(explosion.position[0], explosion.position[1], explosion.size, explosion.size);
-				}
-				
-				// Display hit text
-				if(hitText)
-				{
-					g.setFont(arialBig);
-					g.setColor(Color.orange);
-					fontWidth = g.getFontMetrics(arialBig).stringWidth("EPIC HIT");
-					g.drawString("EPIC HIT", WIDTH / 2 - fontWidth / 2, 150);
-				}
-				
-				g.setFont(arial);
-				
-				// UI
-				String currentPlayer = "";
-				int angle;
-				int power;
-				if(turn == 0)
-				{
-					g.setColor(Color.green.darker());
-				}
-				else
-				{
-					g.setColor(Color.red.darker());
-				}
-				currentPlayer = tanks[turn].getName();
-				angle = Math.abs(tanks[turn].getAngle());
-				power = tanks[turn].getPower();
-				
-				fontWidth = g.getFontMetrics(arial).stringWidth(currentPlayer);
-				g.drawString(currentPlayer + "'s TURN!", WIDTH / 2 - fontWidth, 100);
-				
-				g.drawRect(WIDTH / 4, HEIGHT - 130, WIDTH / 2, 300);
-				fontWidth = g.getFontMetrics(arial).stringWidth("Power: " + power);
-				g.drawString("Angle: " + angle + "°", WIDTH / 4 + 35, HEIGHT - 110);
-				g.drawString("Power: " + power, 3 * WIDTH / 4 - fontWidth - 35, HEIGHT - 110);
-				
-				// Buttons
-				g.setFont(new Font("arial", Font.BOLD, 30));
-				g.drawRect(WIDTH / 4 + 10, HEIGHT - 95, 75, 55);
-				g.drawString("<", WIDTH / 4 + 38, HEIGHT - 55);
-				g.drawRect(WIDTH / 4 + 85, HEIGHT - 95, 75, 55);
-				g.drawString(">", WIDTH / 4 + 115, HEIGHT - 55);
-				
-				g.drawRect(WIDTH - WIDTH / 4 - 155, HEIGHT - 95, 75, 55);
-				g.drawString("-", WIDTH - WIDTH / 4 - 125, HEIGHT - 60);
-				g.drawRect(WIDTH - WIDTH / 4 - 80, HEIGHT - 95, 75, 55);
-				g.drawString("+", WIDTH - WIDTH / 4 - 45, HEIGHT - 60);
-				
-				g.drawRect(WIDTH / 2 - 60, HEIGHT - 120, 125, 80);
-				g.drawString("FIRE!", WIDTH / 2 - 35, HEIGHT - 70);
-				
-				g.drawRect(WIDTH / 4 - 115, HEIGHT - 100, 100, 50);
-				g.drawString("<<", WIDTH / 4 - 85, HEIGHT - 65);
-				
-				g.drawRect(3 * WIDTH / 4 + 15, HEIGHT - 100, 100, 50);
-				g.drawString(">>", 3 * WIDTH / 4 + 50, HEIGHT - 65);
-			}
-			else // We have a winner
-			{
-				// Draw stars
-				g.setColor(Color.white);
-				for(int i = 0; i < stars.length; i++)
-				{
-					g.fillOval(stars[i][0], stars[i][1], 5, 5);
-				}
-				
-				g.setFont(arialBig);
-				if(gameState == 1)
-				{
-					g.setColor(Color.green);
-				}
-				else
-				{
-					g.setColor(Color.red);
-				}
-				
-				fontWidth = g.getFontMetrics(arialBig).stringWidth(tanks[gameState - 1].getName() + " WON!");
-				g.drawString(tanks[gameState - 1].getName() + " WON!", WIDTH / 2 - fontWidth / 2, 50);
-				
-				fontWidth = g.getFontMetrics(arialBig).stringWidth("Click any key to restart");
-				g.drawString("Click any key to restart", WIDTH / 2 - fontWidth / 2, 90);
-			}
-		}
-		else if(menu == 3) // LAN game oirghbtrpuierhtge9[wigh 9[erw8hg89werhg9[erwh g
-		{
-			if(!gameStarted)
+			else if(menu == 3) // LAN Game
 			{
 				g.setColor(Color.white);
 				g.setFont(arial);
@@ -427,108 +257,28 @@ public class PocketTanks implements Runnable
 				g.drawRect(WIDTH / 2 - 50, 500, 100, 75);
 				g.drawString("OK", WIDTH / 2 - 20, 545);
 			}
-			else // Game has started
+		}
+		
+		if(gameStarted && gameState == 0)
+		{
+			g.setFont(arial);
+			g.setColor(Color.white);
+			// Draw stars
+			for(int i = 0; i < stars.length; i++)
 			{
-				g.setFont(arial);
-				g.setColor(Color.white);
-				// Draw stars
-				for(int i = 0; i < stars.length; i++)
-				{
-					g.fillOval(stars[i][0], stars[i][1], 5, 5);
-				}
-				
-				// Draw terrain
-				for(int i = 0; i < numberOfPoints - 1; i++)
-				{
-					g.drawLine(i * quotient, terrain[i], (i + 1) * quotient, terrain[i + 1]);
-				}
-				
-				// Draw tanks, SHIT CAN MOVE THROUGH MOUNTAINS LMAO!!!
-				for(int i = 0; i < tanks.length; i++)
-				{
-					if(i == 0)
-					{
-						g.setColor(Color.green.darker());
-					}
-					else
-					{
-						g.setColor(Color.red.darker());
-					}
-					
-					int index = tanks[i].getIndex();
-					int[] tankPosition = {lerp(pPoints[i][0], index * quotient, 0.4) - drawDelta,
-							lerp(pPoints[i][1], terrain[index], 0.4) - drawDelta};
-					tanks[i].setPosition(tankPosition);
-					// Draw current tank
-					g.fillOval(tankPosition[0], tankPosition[1], tanks[i].getSize(), tanks[i].getSize());
-					
-					// Draw canon
-					Graphics2D g2d = (Graphics2D) g.create(); // with g.create() method we have 2 different object,
-																// which are SEPERATE!!!
-					Rectangle rect = new Rectangle(tankPosition[0] + drawDelta / 2, tankPosition[1] + drawDelta / 2, 30,
-							10);
-					g2d.rotate(tanks[i].getAngle() * Math.PI / 180, rect.x + 5, rect.y + 5);
-					g2d.fill(rect);
-					
-					tankPosition[0] += drawDelta;
-					tankPosition[1] += drawDelta;
-					// Display player name (above the tank)
-					fontWidth = g.getFontMetrics(arial).stringWidth(tanks[i].getName());
-					g.drawString(tanks[i].getName(), tankPosition[0] - fontWidth / 2,
-							tankPosition[1] - g.getFontMetrics(arial).getHeight() - drawDelta);
-					pPoints[i] = tankPosition;
-					
-					int fontWidthHealth = g.getFontMetrics(arial).stringWidth("Health: " + tanks[i].getHealth());
-					fontWidth = Math.max(fontWidth, fontWidthHealth);
-					if(i == 0)
-					{
-						g.drawString(tanks[i].getName() + ":", 30, 40);
-						g.drawString("Health: " + tanks[i].getHealth(), 30, 65);
-					}
-					else
-					{
-						g.drawString(tanks[i].getName() + ":", WIDTH - fontWidth - 30, 40);
-						g.drawString("Health: " + tanks[i].getHealth(), WIDTH - fontWidth - 30, 65);
-					}
-				}
-				
-				// Draw bullet
-				if(bullet != null)
-				{
-					if(bullet.getTeam() == 0)
-					{
-						g.setColor(Color.green.darker());
-					}
-					else
-					{
-						g.setColor(Color.red.darker());
-					}
-					g.fillOval(bullet.getPosition()[0], bullet.getPosition()[1], bullet.getSize(), bullet.getSize());
-				}
-				
-				// Draw explosion
-				if(explosion != null)
-				{
-					g.setColor(Color.orange);
-					g.fillOval(explosion.position[0], explosion.position[1], explosion.size, explosion.size);
-				}
-				
-				// Display hit text
-				if(hitText)
-				{
-					g.setFont(arialBig);
-					g.setColor(Color.orange);
-					fontWidth = g.getFontMetrics(arialBig).stringWidth("EPIC HIT");
-					g.drawString("EPIC HIT", WIDTH / 2 - fontWidth / 2, 150);
-				}
-				
-				g.setFont(arial);
-				
-				// UI
-				String currentPlayer = "";
-				int angle;
-				int power;
-				if(turn == 0)
+				g.fillOval(stars[i][0], stars[i][1], 5, 5);
+			}
+			
+			// Draw terrain
+			for(int i = 0; i < numberOfPoints - 1; i++)
+			{
+				g.drawLine(i * quotient, terrain[i], (i + 1) * quotient, terrain[i + 1]);
+			}
+			
+			// Draw tanks, SHIT CAN MOVE THROUGH MOUNTAINS LMAO!!!
+			for(int i = 0; i < tanks.length; i++)
+			{
+				if(i == 0)
 				{
 					g.setColor(Color.green.darker());
 				}
@@ -536,39 +286,145 @@ public class PocketTanks implements Runnable
 				{
 					g.setColor(Color.red.darker());
 				}
-				currentPlayer = tanks[turn].getName();
-				angle = Math.abs(tanks[turn].getAngle());
-				power = tanks[turn].getPower();
 				
-				fontWidth = g.getFontMetrics(arial).stringWidth(currentPlayer);
-				g.drawString(currentPlayer + "'s TURN!", WIDTH / 2 - fontWidth, 100);
+				int index = tanks[i].getIndex();
+				int[] tankPosition = {lerp(pPoints[i][0], index * quotient, 0.4) - drawDelta,
+						lerp(pPoints[i][1], terrain[index], 0.4) - drawDelta};
+				tanks[i].setPosition(tankPosition);
+				// Draw current tank
+				g.fillOval(tankPosition[0], tankPosition[1], tanks[i].getSize(), tanks[i].getSize());
 				
-				g.drawRect(WIDTH / 4, HEIGHT - 130, WIDTH / 2, 300);
-				fontWidth = g.getFontMetrics(arial).stringWidth("Power: " + power);
-				g.drawString("Angle: " + angle + "°", WIDTH / 4 + 35, HEIGHT - 110);
-				g.drawString("Power: " + power, 3 * WIDTH / 4 - fontWidth - 35, HEIGHT - 110);
+				// Draw canon
+				Graphics2D g2d = (Graphics2D) g.create(); // with g.create() method we have 2 different object,
+															// which are SEPERATE!!!
+				Rectangle rect = new Rectangle(tankPosition[0] + drawDelta / 2, tankPosition[1] + drawDelta / 2, 30,
+						10);
+				g2d.rotate(tanks[i].getAngle() * Math.PI / 180, rect.x + 5, rect.y + 5);
+				g2d.fill(rect);
 				
-				// Buttons
-				g.setFont(new Font("arial", Font.BOLD, 30));
-				g.drawRect(WIDTH / 4 + 10, HEIGHT - 95, 75, 55);
-				g.drawString("<", WIDTH / 4 + 38, HEIGHT - 55);
-				g.drawRect(WIDTH / 4 + 85, HEIGHT - 95, 75, 55);
-				g.drawString(">", WIDTH / 4 + 115, HEIGHT - 55);
+				tankPosition[0] += drawDelta;
+				tankPosition[1] += drawDelta;
+				// Display player name (above the tank)
+				fontWidth = g.getFontMetrics(arial).stringWidth(tanks[i].getName());
+				g.drawString(tanks[i].getName(), tankPosition[0] - fontWidth / 2,
+						tankPosition[1] - g.getFontMetrics(arial).getHeight() - drawDelta);
+				pPoints[i] = tankPosition;
 				
-				g.drawRect(WIDTH - WIDTH / 4 - 155, HEIGHT - 95, 75, 55);
-				g.drawString("-", WIDTH - WIDTH / 4 - 125, HEIGHT - 60);
-				g.drawRect(WIDTH - WIDTH / 4 - 80, HEIGHT - 95, 75, 55);
-				g.drawString("+", WIDTH - WIDTH / 4 - 45, HEIGHT - 60);
-				
-				g.drawRect(WIDTH / 2 - 60, HEIGHT - 120, 125, 80);
-				g.drawString("FIRE!", WIDTH / 2 - 35, HEIGHT - 70);
-				
-				g.drawRect(WIDTH / 4 - 115, HEIGHT - 100, 100, 50);
-				g.drawString("<<", WIDTH / 4 - 85, HEIGHT - 65);
-				
-				g.drawRect(3 * WIDTH / 4 + 15, HEIGHT - 100, 100, 50);
-				g.drawString(">>", 3 * WIDTH / 4 + 50, HEIGHT - 65);
+				int fontWidthHealth = g.getFontMetrics(arial).stringWidth("Health: " + tanks[i].getHealth());
+				fontWidth = Math.max(fontWidth, fontWidthHealth);
+				if(i == 0)
+				{
+					g.drawString(tanks[i].getName() + ":", 30, 40);
+					g.drawString("Health: " + tanks[i].getHealth(), 30, 65);
+				}
+				else
+				{
+					g.drawString(tanks[i].getName() + ":", WIDTH - fontWidth - 30, 40);
+					g.drawString("Health: " + tanks[i].getHealth(), WIDTH - fontWidth - 30, 65);
+				}
 			}
+			
+			// Draw bullet
+			if(bullet != null)
+			{
+				if(bullet.getTeam() == 0)
+				{
+					g.setColor(Color.green.darker());
+				}
+				else
+				{
+					g.setColor(Color.red.darker());
+				}
+				g.fillOval(bullet.getPosition()[0], bullet.getPosition()[1], bullet.getSize(), bullet.getSize());
+			}
+			
+			// Draw explosion
+			if(explosion != null)
+			{
+				g.setColor(Color.orange);
+				g.fillOval(explosion.position[0], explosion.position[1], explosion.size, explosion.size);
+			}
+			
+			// Display hit text
+			if(hitText)
+			{
+				g.setFont(arialBig);
+				g.setColor(Color.orange);
+				fontWidth = g.getFontMetrics(arialBig).stringWidth("EPIC HIT");
+				g.drawString("EPIC HIT", WIDTH / 2 - fontWidth / 2, 150);
+			}
+			
+			g.setFont(arial);
+			
+			// UI
+			String currentPlayer = "";
+			int angle;
+			int power;
+			if(turn == 0)
+			{
+				g.setColor(Color.green.darker());
+			}
+			else
+			{
+				g.setColor(Color.red.darker());
+			}
+			currentPlayer = tanks[turn].getName();
+			angle = Math.abs(tanks[turn].getAngle());
+			power = tanks[turn].getPower();
+			
+			fontWidth = g.getFontMetrics(arial).stringWidth(currentPlayer);
+			g.drawString(currentPlayer + "'s TURN!", WIDTH / 2 - fontWidth, 100);
+			
+			g.drawRect(WIDTH / 4, HEIGHT - 130, WIDTH / 2, 300);
+			fontWidth = g.getFontMetrics(arial).stringWidth("Power: " + power);
+			g.drawString("Angle: " + angle + "°", WIDTH / 4 + 35, HEIGHT - 110);
+			g.drawString("Power: " + power, 3 * WIDTH / 4 - fontWidth - 35, HEIGHT - 110);
+			
+			// Buttons
+			g.setFont(new Font("arial", Font.BOLD, 30));
+			g.drawRect(WIDTH / 4 + 10, HEIGHT - 95, 75, 55);
+			g.drawString("<", WIDTH / 4 + 38, HEIGHT - 55);
+			g.drawRect(WIDTH / 4 + 85, HEIGHT - 95, 75, 55);
+			g.drawString(">", WIDTH / 4 + 115, HEIGHT - 55);
+			
+			g.drawRect(WIDTH - WIDTH / 4 - 155, HEIGHT - 95, 75, 55);
+			g.drawString("-", WIDTH - WIDTH / 4 - 125, HEIGHT - 60);
+			g.drawRect(WIDTH - WIDTH / 4 - 80, HEIGHT - 95, 75, 55);
+			g.drawString("+", WIDTH - WIDTH / 4 - 45, HEIGHT - 60);
+			
+			g.drawRect(WIDTH / 2 - 60, HEIGHT - 120, 125, 80);
+			g.drawString("FIRE!", WIDTH / 2 - 35, HEIGHT - 70);
+			
+			g.drawRect(WIDTH / 4 - 115, HEIGHT - 100, 100, 50);
+			g.drawString("<<", WIDTH / 4 - 85, HEIGHT - 65);
+			
+			g.drawRect(3 * WIDTH / 4 + 15, HEIGHT - 100, 100, 50);
+			g.drawString(">>", 3 * WIDTH / 4 + 50, HEIGHT - 65);
+		}
+		else if(gameStarted) // We have a winner
+		{
+			// Draw stars
+			g.setColor(Color.white);
+			for(int i = 0; i < stars.length; i++)
+			{
+				g.fillOval(stars[i][0], stars[i][1], 5, 5);
+			}
+			
+			g.setFont(arialBig);
+			if(gameState == 1)
+			{
+				g.setColor(Color.green);
+			}
+			else
+			{
+				g.setColor(Color.red);
+			}
+			
+			fontWidth = g.getFontMetrics(arialBig).stringWidth(tanks[gameState - 1].getName() + " WON!");
+			g.drawString(tanks[gameState - 1].getName() + " WON!", WIDTH / 2 - fontWidth / 2, 50);
+			
+			fontWidth = g.getFontMetrics(arialBig).stringWidth("Click any key to restart");
+			g.drawString("Click any key to restart", WIDTH / 2 - fontWidth / 2, 90);
 		}
 	}
 	
@@ -1099,7 +955,23 @@ public class PocketTanks implements Runnable
 					playerName += e.getKeyChar();
 				}
 			}
-			else if(menu == 2 && gameState == 0)
+			else if(menu == 3 && !gameStarted) // LAN game info input
+			{
+				if(key == 10) // enter
+				{
+					buttonOK();
+				}
+				else if(key == 8 && playerInfoLAN[infoCounter].length() > 0) // backspace
+				{
+					playerInfoLAN[infoCounter] = playerInfoLAN[infoCounter].substring(0,
+							playerInfoLAN[infoCounter].length() - 1);
+				}
+				else
+				{
+					playerInfoLAN[infoCounter] += e.getKeyChar();
+				}
+			}
+			else if(gameStarted && gameState == 0 && ((menu == 3 && turn == 0) || menu == 2))
 			{
 				if(key == 37)
 				{
@@ -1133,22 +1005,6 @@ public class PocketTanks implements Runnable
 //				{
 //					restartGame();
 //				}
-			}
-			else if(menu == 3 && !gameStarted) // LAN game input
-			{
-				if(key == 10) // enter
-				{
-					buttonOK();
-				}
-				else if(key == 8 && playerInfoLAN[infoCounter].length() > 0) // backspace
-				{
-					playerInfoLAN[infoCounter] = playerInfoLAN[infoCounter].substring(0,
-							playerInfoLAN[infoCounter].length() - 1);
-				}
-				else
-				{
-					playerInfoLAN[infoCounter] += e.getKeyChar();
-				}
 			}
 			else if(gameState != 0)
 			{
