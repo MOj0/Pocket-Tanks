@@ -1,6 +1,8 @@
+import java.io.Serializable;
 
-public class Tank
+public class Tank implements Serializable
 {
+	private static final long serialVersionUID = 1L;
 	private String name;
 	private int index;
 	private int health;
