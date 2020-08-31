@@ -384,7 +384,7 @@ public class PocketTanks implements Runnable
 				g.drawString("Click any key to restart", WIDTH / 2 - fontWidth / 2, 90);
 			}
 		}
-		else if(menu == 3) // LAN game
+		else if(menu == 3) // LAN game oirghbtrpuierhtge9[wigh 9[erw8hg89werhg9[erwh g
 		{
 			if(!gameStarted)
 			{
