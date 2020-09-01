@@ -50,7 +50,8 @@ public class PocketTanks implements Runnable
 	private int fontWidth;
 	
 	private Tank[] tanks;
-	private Tank bot;
+//	private Tank bot; //TODO Implement bot
+// 	bot = new Tank((int) (Math.random() * WIDTH - WIDTH / 4 - 10), 100);
 	
 	private int[][] pPoints; // previous points needed for lerping
 	private Bullet bullet;
@@ -66,7 +67,7 @@ public class PocketTanks implements Runnable
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setSize(WIDTH, HEIGHT);
 		frame.setLocationRelativeTo(null);
-		frame.setResizable(false);
+		// frame.setResizable(false);//TODO Uncomment
 		frame.setVisible(true);
 		
 		tanks = new Tank[2];
@@ -91,9 +92,6 @@ public class PocketTanks implements Runnable
 		World world = new World();
 		terrain = world.terrain;
 		stars = world.stars;
-		
-		// TODO REFRACTOR
-		// bot = new Tank((int) (Math.random() * WIDTH - WIDTH / 4 - 10), 100);
 		
 		playerInputRect = new Rectangle(WIDTH / 2 - 250, 110, 500, 75);
 		playerName = "";
@@ -122,7 +120,7 @@ public class PocketTanks implements Runnable
 			
 			try
 			{
-				thread.sleep(10);
+				thread.sleep(1);
 			}
 			catch(Exception e)
 			{
@@ -133,6 +131,35 @@ public class PocketTanks implements Runnable
 	
 	public void tick()
 	{
+		if(menu == 3 && gameStarted && gameState == 0) // LAN game in progress
+		{
+			if(turn == 0) // First player sends the data
+			{
+				try
+				{
+					oos.writeObject(tanks[0]);
+					tanks[0] = (Tank) ois.readObject();
+				}
+				catch(Exception ex)
+				{
+					ex.printStackTrace();
+				}
+			}
+			else // Second player reads the data
+			{
+				try
+				{
+					tanks[1] = (Tank) ois.readObject();
+					oos.writeObject(tanks[1]); // Has to write it back otherwise it doesn't work for SOME reason
+				}
+				catch(Exception e)
+				{
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		// TODO Generalize for LAN game
 		if(explosion != null)
 		{
 			int index = (turn + 1) % 2;
@@ -278,11 +305,8 @@ public class PocketTanks implements Runnable
 			// Draw tanks, SHIT CAN MOVE THROUGH MOUNTAINS LMAO!!!
 			for(int i = 0; i < tanks.length; i++)
 			{
-				if(i == 0)
-				{
-					g.setColor(Color.green.darker());
-				}
-				else
+				g.setColor(Color.green.darker());
+				if(i == 1)
 				{
 					g.setColor(Color.red.darker());
 				}
@@ -865,7 +889,7 @@ public class PocketTanks implements Runnable
 					buttonOK();
 				}
 			}
-			else if(menu == 2 && gameStarted && gameState == 0)
+			else if(gameStarted && gameState == 0 && ((menu == 3 && turn == 0) || menu == 2))
 			{
 				if(y >= HEIGHT - 100 && y <= HEIGHT - 50)
 				{
@@ -905,7 +929,7 @@ public class PocketTanks implements Runnable
 					}
 				}
 			}
-			else if(menu == 2 && gameState != 0)
+			else if(menu == 2 && gameState != 0) // TODO FIX THIS FOR LAN GAME
 			{
 				restartGame();
 			}
@@ -1009,6 +1033,18 @@ public class PocketTanks implements Runnable
 			else if(gameState != 0)
 			{
 				restartGame();
+			}
+			
+			if(menu == 3 && gameStarted && gameState == 0 && turn == 0)
+			{
+				try
+				{
+					oos.writeObject(tanks[0]);
+				}
+				catch(Exception ex)
+				{
+					ex.printStackTrace();
+				}
 			}
 		}
 		

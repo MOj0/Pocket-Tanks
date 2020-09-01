@@ -24,6 +24,11 @@ public class Tank implements Serializable
 		position = new int[2];
 	}
 	
+	public String printData()
+	{
+		return name + ", Health: " + health + " angle: " + angle;
+	}
+	
 	public boolean isAlive()
 	{
 		return health > 0;
