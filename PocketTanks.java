@@ -120,7 +120,7 @@ public class PocketTanks implements Runnable
 			
 			try
 			{
-				thread.sleep(1);
+				thread.sleep(10);
 			}
 			catch(Exception e)
 			{
@@ -247,9 +247,8 @@ public class PocketTanks implements Runnable
 			{
 				g.setColor(Color.white);
 				g.setFont(arial);
-				
-				// Name input
 				g.drawString("Enter your name", WIDTH / 2 - 75, 100);
+				
 				if(infoCounter == 0)
 				{
 					g.setColor(Color.green);
@@ -560,7 +559,7 @@ public class PocketTanks implements Runnable
 				}
 			}
 			
-			// Initialise the LAN game
+			// Initialize the LAN game
 			if(infoCounter == 3 && !gameStarted)
 			{
 				String ip = playerInfoLAN[1];
@@ -630,7 +629,6 @@ public class PocketTanks implements Runnable
 						e.printStackTrace();
 					}
 				}
-				
 				gameStarted = true;
 			}
 		}
@@ -929,9 +927,9 @@ public class PocketTanks implements Runnable
 					}
 				}
 			}
-			else if(menu == 2 && gameState != 0) // TODO FIX THIS FOR LAN GAME
+			else if(menu == 2 && gameState != 0)
 			{
-				restartGame();
+				restartGame(); // TODO FIX THIS FOR LAN GAME
 			}
 		}
 		
@@ -1033,18 +1031,6 @@ public class PocketTanks implements Runnable
 			else if(gameState != 0)
 			{
 				restartGame();
-			}
-			
-			if(menu == 3 && gameStarted && gameState == 0 && turn == 0)
-			{
-				try
-				{
-					oos.writeObject(tanks[0]);
-				}
-				catch(Exception ex)
-				{
-					ex.printStackTrace();
-				}
 			}
 		}
 		

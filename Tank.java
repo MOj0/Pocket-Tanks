@@ -10,7 +10,7 @@ public class Tank implements Serializable
 	private int angle;
 	private int power;
 	private boolean hasMoved;
-	private int[] position;
+	private int[] position; // Not in use, delete?
 	
 	public Tank(String n, int i, int h, int s)
 	{
