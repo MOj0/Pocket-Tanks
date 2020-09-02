@@ -131,6 +131,34 @@ public class PocketTanks implements Runnable
 	
 	public void tick()
 	{
+		if(menu == 3 && gameStarted && gameState == 0 && bullet == null && explosion == null) // LAN game in progress
+		{
+			if(turn == 0) // First player sends the data
+			{
+				try
+				{
+					oos.writeObject(tanks[0]);
+					tanks[0] = (Tank) ois.readObject();
+				}
+				catch(Exception ex)
+				{
+					ex.printStackTrace();
+				}
+			}
+			else // Second player reads the data
+			{
+				try
+				{
+					tanks[1] = (Tank) ois.readObject();
+					oos.writeObject(tanks[1]); // Has to write it back otherwise it doesn't work for SOME reason
+				}
+				catch(Exception e)
+				{
+					e.printStackTrace();
+				}
+			}
+		}
+		
 		if(explosion != null)
 		{
 			if(menu == 3)
@@ -218,34 +246,6 @@ public class PocketTanks implements Runnable
 				explosion = new Explosion(new int[] {collide * quotient - 30, terrain[collide] - 30}, 60, 50);
 				playSound("src/sounds/explosion.wav");
 				bullet = null;
-			}
-		}
-		
-		if(menu == 3 && gameStarted && gameState == 0 && bullet == null && explosion == null) // LAN game in progress
-		{
-			if(turn == 0) // First player sends the data
-			{
-				try
-				{
-					oos.writeObject(tanks[0]);
-					tanks[0] = (Tank) ois.readObject();
-				}
-				catch(Exception ex)
-				{
-					ex.printStackTrace();
-				}
-			}
-			else // Second player reads the data
-			{
-				try
-				{
-					tanks[1] = (Tank) ois.readObject();
-					oos.writeObject(tanks[1]); // Has to write it back otherwise it doesn't work for SOME reason
-				}
-				catch(Exception e)
-				{
-					e.printStackTrace();
-				}
 			}
 		}
 	}
