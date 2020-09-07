@@ -3,20 +3,20 @@ import java.io.Serializable;
 public class Tank implements Serializable
 {
 	private static final long serialVersionUID = 1L;
-	private String name;
-	private int index;
-	private int health;
-	private int size;
-	private int angle;
-	private int power;
-	private boolean hasMoved;
-	private int[] position; // Not in use, delete?
+	public String name;
+	public int index;
+	public int health;
+	public int size;
+	public int angle;
+	public int power;
+	public boolean hasMoved;
+	public int[] position; // Not in use, delete?
 	
-	public Tank(String n, int i, int h, int s)
+	public Tank(String n, int i, int s)
 	{
 		name = n;
 		index = i;
-		health = h;
+		health = 100;
 		size = s;
 		angle = 0;
 		power = 50;
@@ -49,17 +49,6 @@ public class Tank implements Serializable
 		power = Math.max(1, Math.min(power + p, 100));
 	}
 	
-	public void setIndex(int i)
-	{
-		index = i;
-		hasMoved = true;
-	}
-	
-	public void setMoved(boolean m)
-	{
-		hasMoved = m;
-	}
-	
 	public void setHealth(int h)
 	{
 		health = h;
@@ -70,43 +59,42 @@ public class Tank implements Serializable
 		position = p;
 	}
 	
-	public int[] getPosition()
+	public void setMoved(boolean m)
 	{
-		return position;
+		hasMoved = m;
 	}
 	
-	public String getName()
+	public void moveTank(int dir, int max)
 	{
-		return name;
+		if(hasMoved)
+		{
+			return;
+		}
+		int move = Math.abs(dir);
+		boolean moveCondition = false;
+		if(dir > 0 && max - index > move)
+		{
+			moveCondition = true;
+		}
+		else if(dir < 0 && index > move)
+		{
+			moveCondition = true;
+		}
+		
+		if(moveCondition)
+		{
+			index += dir;
+			hasMoved = true;
+		}
 	}
 	
-	public int getIndex()
+	public void setNewIndex(int i)
 	{
-		return index;
-	}
-	
-	public int getHealth()
-	{
-		return health;
-	}
-	
-	public int getSize()
-	{
-		return size;
-	}
-	
-	public int getAngle()
-	{
-		return angle;
-	}
-	
-	public int getPower()
-	{
-		return power;
-	}
-	
-	public boolean getMoved()
-	{
-		return hasMoved;
+		index = i;
+		health = 100;
+		angle = 0;
+		power = 50;
+		hasMoved = false;
+		position = new int[2];
 	}
 }

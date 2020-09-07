@@ -1,13 +1,17 @@
+import java.io.Serializable;
 
-public class Explosion
+@SuppressWarnings("serial")
+public class Explosion implements Serializable
 {
 	public int[] position;
 	public int size;
 	public boolean hit;
 	public int duration;
+	public int team;
 	
-	public Explosion(int[] pos, int s, int d)
+	public Explosion(int t, int[] pos, int s, int d)
 	{
+		team = t;
 		position = pos;
 		size = s;
 		hit = false;

@@ -1,5 +1,7 @@
+import java.io.Serializable;
 
-public class Bullet
+@SuppressWarnings("serial")
+public class Bullet implements Serializable
 {
 	private int team;
 	private int[] position;
@@ -37,9 +39,6 @@ public class Bullet
 		
 		for(int i = 1; i < terrain.length; i++)
 		{
-			// TODO: When bullet collides with the ground create an explosion (check for the
-			// enemy tank in a radius)
-			
 			if(Math.abs(position[0] - i * quotient) <= quotient) // Check x coordinate
 			{
 				if(position[1] > terrain[i]) // If it is under the ground return immediately

@@ -18,14 +18,20 @@ public class PocketTanks implements Runnable
 	private Painter painter;
 	private Thread thread;
 	
+	private Tank[] tanks;
+	private Bullet bullet;
+	private Explosion explosion;
+	
 	// Network
-	private String[] playerInfoLAN = {"", "", ""}; // name, IP, port
+	private GameData gameData;
+	private GameData enemyGameData;
+	private String[] playerInfo = {"", "", ""}; // name, IP, port
 	private int infoCounter;
 	private Socket socket;
 	private ServerSocket serverSocket;
 	private ObjectInputStream ois;
 	private ObjectOutputStream oos;
-	private boolean accepted;
+	private boolean joined;
 	
 	private int menu;
 	private Font arial;
@@ -46,17 +52,13 @@ public class PocketTanks implements Runnable
 	private int[] terrain;
 	
 	private Rectangle playerInputRect;
-	private String playerName;
 	private int fontWidth;
 	
-	private Tank[] tanks;
-//	private Tank bot; //TODO Implement bot
-// 	bot = new Tank((int) (Math.random() * WIDTH - WIDTH / 4 - 10), 100);
-	
 	private int[][] pPoints; // previous points needed for lerping
-	private Bullet bullet;
-	private Explosion explosion;
 	private boolean hitText;
+	private World world;
+	private boolean secondPlayer;
+	private boolean restartedGame;
 	
 	public PocketTanks()
 	{
@@ -70,7 +72,6 @@ public class PocketTanks implements Runnable
 		frame.setResizable(false);
 		frame.setVisible(true);
 		
-		tanks = new Tank[2];
 		menu = 0;
 		gameStarted = false;
 		gameState = 0; // 0 - Nobody won, 1 - player1 won ...
@@ -83,30 +84,35 @@ public class PocketTanks implements Runnable
 		rectDeltaY = 150;
 		pPoints = new int[2][2];
 		hitText = false;
-		drawDelta = 10;
+		drawDelta = 10; // Half of tank's size
+		
+		tanks = new Tank[2];
 		
 		numberOfPoints = 128;
 		quotient = WIDTH / numberOfPoints;
 		
 		// Create the world and assign it to global variables
-		World world = new World();
+		world = new World();
 		terrain = world.terrain;
 		stars = world.stars;
 		
 		playerInputRect = new Rectangle(WIDTH / 2 - 250, 110, 500, 75);
-		playerName = "";
 		
 		infoCounter = 0;
-		accepted = false;
+		joined = false;
+		secondPlayer = false;
+		restartedGame = false;
+		
+		gameData = new GameData();
+		enemyGameData = new GameData();
 		
 		thread = new Thread(this);
 		thread.start();
 	}
 	
-	@SuppressWarnings("unused")
 	public static void main(String[] args)
 	{
-		PocketTanks pt = new PocketTanks();
+		new PocketTanks();
 	}
 	
 	@SuppressWarnings("static-access")
@@ -131,14 +137,56 @@ public class PocketTanks implements Runnable
 	
 	public void tick()
 	{
-		if(menu == 3 && gameStarted && gameState == 0 && bullet == null && explosion == null) // LAN game in progress
+		if(menu == 2)
 		{
+			// Update the local bullet and explosion, tanks[] is already local
+			bullet = gameData.bullet;
+			explosion = gameData.explosion;
+		}
+		if(menu == 3 && gameStarted && gameState == 0) // Game in progress
+		{
+			if(restartedGame) // Restart game procedure
+			{
+				if(turn == 1)
+				{
+					try
+					{
+						oos.writeObject(gameData);
+						gameData = (GameData) ois.readObject();
+					}
+					catch(Exception ex)
+					{
+						ex.printStackTrace();
+					}
+				}
+				else
+				{
+					try
+					{
+						enemyGameData = (GameData) ois.readObject();
+						oos.writeObject(enemyGameData);
+					}
+					catch(Exception e)
+					{
+						e.printStackTrace();
+					}
+					tanks[1] = enemyGameData.tank;
+				}
+				
+				restartedGame = false;
+			}
+			
 			if(turn == 0) // First player sends the data
 			{
+				// Update the local variables
+				tanks[0] = gameData.tank;
+				bullet = gameData.bullet;
+				explosion = gameData.explosion;
+				
 				try
 				{
-					oos.writeObject(tanks[0]);
-					tanks[0] = (Tank) ois.readObject();
+					oos.writeObject(gameData);
+					gameData = (GameData) ois.readObject();
 				}
 				catch(Exception ex)
 				{
@@ -149,103 +197,79 @@ public class PocketTanks implements Runnable
 			{
 				try
 				{
-					tanks[1] = (Tank) ois.readObject();
-					oos.writeObject(tanks[1]); // Has to write it back otherwise it doesn't work for SOME reason
+					enemyGameData = (GameData) ois.readObject();
+					oos.writeObject(enemyGameData); // Has to write it back otherwise it doesn't work for SOME reason
 				}
 				catch(Exception e)
 				{
 					e.printStackTrace();
 				}
+				tanks[1] = enemyGameData.tank;
+				bullet = enemyGameData.bullet;
+				explosion = enemyGameData.explosion;
+				gameData.explosion = explosion;
+				turn = (enemyGameData.turn + 1) % 2;
+				gameData.turn = turn;
 			}
 		}
 		
-		if(explosion != null)
+		if(gameData.explosion != null)
 		{
-			if(menu == 3)
+			int team = gameData.explosion.team;
+			int index = team;
+			if(turn == team)
 			{
-				if(turn == 0) // Sends
-				{
-					try
-					{
-						oos.writeObject(explosion);
-						explosion = (Explosion) ois.readObject();
-					}
-					catch(Exception e)
-					{
-						e.printStackTrace();
-					}
-				}
-				else // Reads
-				{
-					try
-					{
-						explosion = (Explosion) ois.readObject();
-						oos.writeObject(explosion);
-					}
-					catch(Exception e)
-					{
-						e.printStackTrace();
-					}
-				}
+				index = (turn + 1) % 2;
 			}
-			int index = (turn + 1) % 2;
-			boolean collision = explosion.checkCollision(tanks[index].getPosition()[0] + tanks[index].getSize() / 2,
-					tanks[index].getPosition()[1] + tanks[index].getSize() / 2, tanks[index].getSize());
+			boolean collision = gameData.explosion.checkCollision(tanks[index].position[0] + tanks[index].size / 2,
+					tanks[index].position[1] + tanks[index].size / 2, tanks[index].size);
 			
 			if(collision)
 			{
-				tanks[index].dealDamage(25);
-				if(!tanks[index].isAlive())
+				if(turn == team) // Do calculations locally
 				{
-					gameState = turn + 1;
+					tanks[index].dealDamage(25);
+					if(!tanks[index].isAlive()) // If enemy tank isnt alive
+					{
+						gameState = turn + 1;
+					}
+					hitText = true;
 				}
-				hitText = true;
+				else // Do calculations on an object
+				{
+					gameData.tank.dealDamage(25);
+					if(!gameData.tank.isAlive())
+					{
+						gameState = turn + 1;
+					}
+					hitText = true;
+				}
 			}
 			
-			if(!explosion.update())
+			if(!gameData.explosion.update())
 			{
-				explosion = null;
+				gameData.explosion = null;
 				hitText = false;
-				changeTurn();
+				if(gameState == 0)
+				{
+					changeTurn();
+				}
 			}
 		}
 		
-		if(bullet != null)
+		if(gameData.bullet != null)
 		{
-			if(menu == 3 && explosion == null)
-			{
-				if(turn == 0) // Sends
-				{
-					try
-					{
-						oos.writeObject(bullet);
-						bullet = (Bullet) ois.readObject();
-					}
-					catch(Exception e)
-					{
-						e.printStackTrace();
-					}
-				}
-				else // Reads
-				{
-					try
-					{
-						bullet = (Bullet) ois.readObject();
-						oos.writeObject(bullet);
-					}
-					catch(Exception e)
-					{
-						e.printStackTrace();
-					}
-				}
-			}
-			bullet.updatePoisition();
-			int collide = bullet.checkCollision(quotient, terrain);
+			gameData.bullet.updatePoisition();
+			int collide = gameData.bullet.checkCollision(quotient, terrain);
 			if(collide != -1)
 			{
-				explosion = new Explosion(new int[] {collide * quotient - 30, terrain[collide] - 30}, 60, 50);
-				playSound("src/sounds/explosion.wav");
-				bullet = null;
+				gameData.explosion = new Explosion(turn, new int[] {collide * quotient - 30, terrain[collide] - 30}, 60,
+						50);
+				if(menu == 2)
+				{
+					playSound("src/sounds/explosion.wav");
+				}
+				gameData.bullet = null;
 			}
 		}
 	}
@@ -291,12 +315,12 @@ public class PocketTanks implements Runnable
 				g.drawString("Player " + (turn + 1) + ", enter your name", WIDTH / 2 - 125, 100);
 				
 				g.drawRect(playerInputRect.x, playerInputRect.y, playerInputRect.width, playerInputRect.height);
-				g.drawString(playerName, playerInputRect.x + 5, playerInputRect.y + playerInputRect.height / 2 + 11);
+				g.drawString(playerInfo[0], playerInputRect.x + 5, playerInputRect.y + playerInputRect.height / 2 + 11);
 				
 				g.drawRect(WIDTH / 2 - 50, 500, 100, 75);
 				g.drawString("OK", WIDTH / 2 - 20, 545);
 			}
-			else if(menu == 3) // LAN Game
+			else if(menu == 3) // LAN Game input
 			{
 				g.setColor(Color.white);
 				g.setFont(arial);
@@ -308,8 +332,7 @@ public class PocketTanks implements Runnable
 				}
 				g.drawRect(playerInputRect.x, playerInputRect.y, playerInputRect.width, playerInputRect.height);
 				g.setColor(Color.white);
-				g.drawString(playerInfoLAN[0], playerInputRect.x + 5,
-						playerInputRect.y + playerInputRect.height / 2 + 10);
+				g.drawString(playerInfo[0], playerInputRect.x + 5, playerInputRect.y + playerInputRect.height / 2 + 10);
 				
 				// IP input
 				g.drawString("Enter IP:", WIDTH / 2 - 40, 220);
@@ -319,7 +342,7 @@ public class PocketTanks implements Runnable
 				}
 				g.drawRect(playerInputRect.x, playerInputRect.y + 125, playerInputRect.width, playerInputRect.height);
 				g.setColor(Color.white);
-				g.drawString(playerInfoLAN[1], playerInputRect.x + 5,
+				g.drawString(playerInfo[1], playerInputRect.x + 5,
 						playerInputRect.y + playerInputRect.height / 2 + 130);
 				
 				// Port input
@@ -330,15 +353,14 @@ public class PocketTanks implements Runnable
 				}
 				g.drawRect(playerInputRect.x, playerInputRect.y + 250, playerInputRect.width, playerInputRect.height);
 				g.setColor(Color.white);
-				g.drawString(playerInfoLAN[2], playerInputRect.x + 5,
+				g.drawString(playerInfo[2], playerInputRect.x + 5,
 						playerInputRect.y + playerInputRect.height / 2 + 255);
 				
 				g.drawRect(WIDTH / 2 - 50, 500, 100, 75);
 				g.drawString("OK", WIDTH / 2 - 20, 545);
 			}
 		}
-		
-		if(gameStarted && gameState == 0)
+		else if(gameStarted && gameState == 0) // Game in progress
 		{
 			g.setFont(arial);
 			g.setColor(Color.white);
@@ -354,7 +376,7 @@ public class PocketTanks implements Runnable
 				g.drawLine(i * quotient, terrain[i], (i + 1) * quotient, terrain[i + 1]);
 			}
 			
-			// Draw tanks, SHIT CAN MOVE THROUGH MOUNTAINS LMAO!!!
+			// Draw tanks
 			for(int i = 0; i < tanks.length; i++)
 			{
 				g.setColor(Color.green.darker());
@@ -363,54 +385,69 @@ public class PocketTanks implements Runnable
 					g.setColor(Color.red.darker());
 				}
 				
-				int index = tanks[i].getIndex();
+				int index = tanks[i].index;
 				int[] tankPosition = {lerp(pPoints[i][0], index * quotient, 0.4) - drawDelta,
 						lerp(pPoints[i][1], terrain[index], 0.4) - drawDelta};
 				tanks[i].setPosition(tankPosition);
 				// Draw current tank
-				g.fillOval(tankPosition[0], tankPosition[1], tanks[i].getSize(), tanks[i].getSize());
+				g.fillOval(tankPosition[0], tankPosition[1], tanks[i].size, tanks[i].size);
 				
 				// Draw canon
 				Graphics2D g2d = (Graphics2D) g.create(); // with g.create() method we have 2 different object,
 															// which are SEPERATE!!!
 				Rectangle rect = new Rectangle(tankPosition[0] + drawDelta / 2, tankPosition[1] + drawDelta / 2, 30,
 						10);
-				g2d.rotate(tanks[i].getAngle() * Math.PI / 180, rect.x + 5, rect.y + 5);
+				g2d.rotate(tanks[i].angle * Math.PI / 180, rect.x + 5, rect.y + 5);
 				g2d.fill(rect);
 				
 				tankPosition[0] += drawDelta;
 				tankPosition[1] += drawDelta;
 				// Display player name (above the tank)
-				fontWidth = g.getFontMetrics(arial).stringWidth(tanks[i].getName());
-				g.drawString(tanks[i].getName(), tankPosition[0] - fontWidth / 2,
+				fontWidth = g.getFontMetrics(arial).stringWidth(tanks[i].name);
+				g.drawString(tanks[i].name, tankPosition[0] - fontWidth / 2,
 						tankPosition[1] - g.getFontMetrics(arial).getHeight() - drawDelta);
 				pPoints[i] = tankPosition;
 				
-				int fontWidthHealth = g.getFontMetrics(arial).stringWidth("Health: " + tanks[i].getHealth());
+				int fontWidthHealth = g.getFontMetrics(arial).stringWidth("Health: " + tanks[i].health);
 				fontWidth = Math.max(fontWidth, fontWidthHealth);
-				if(i == 0)
+				if(i == 0 && !secondPlayer || i == 1 && secondPlayer)
 				{
-					g.drawString(tanks[i].getName() + ":", 30, 40);
-					g.drawString("Health: " + tanks[i].getHealth(), 30, 65);
+					g.drawString(tanks[i].name + ":", 30, 40);
+					g.drawString("Health: " + tanks[i].health, 30, 65);
 				}
 				else
 				{
-					g.drawString(tanks[i].getName() + ":", WIDTH - fontWidth - 30, 40);
-					g.drawString("Health: " + tanks[i].getHealth(), WIDTH - fontWidth - 30, 65);
+					g.drawString(tanks[i].name + ":", WIDTH - fontWidth - 30, 40);
+					g.drawString("Health: " + tanks[i].health, WIDTH - fontWidth - 30, 65);
 				}
 			}
 			
 			// Draw bullet
 			if(bullet != null)
 			{
-				if(bullet.getTeam() == 0)
+				if(menu == 2)
 				{
-					g.setColor(Color.green.darker());
+					if(bullet.getTeam() == 0)
+					{
+						g.setColor(Color.green.darker());
+					}
+					else
+					{
+						g.setColor(Color.red.darker());
+					}
 				}
-				else
+				else if(menu == 3)
 				{
-					g.setColor(Color.red.darker());
+					if(bullet.getTeam() == turn)
+					{
+						g.setColor(Color.green.darker());
+					}
+					else
+					{
+						g.setColor(Color.red.darker());
+					}
 				}
+				
 				g.fillOval(bullet.getPosition()[0], bullet.getPosition()[1], bullet.getSize(), bullet.getSize());
 			}
 			
@@ -444,12 +481,16 @@ public class PocketTanks implements Runnable
 			{
 				g.setColor(Color.red.darker());
 			}
-			currentPlayer = tanks[turn].getName();
-			angle = Math.abs(tanks[turn].getAngle());
-			power = tanks[turn].getPower();
+			currentPlayer = tanks[turn].name + "'s";
+			if(menu == 3 && turn == 0)
+			{
+				currentPlayer = "YOUR";
+			}
+			angle = Math.abs(tanks[turn].angle);
+			power = tanks[turn].power;
 			
 			fontWidth = g.getFontMetrics(arial).stringWidth(currentPlayer);
-			g.drawString(currentPlayer + "'s TURN!", WIDTH / 2 - fontWidth, 100);
+			g.drawString(currentPlayer + " TURN!", WIDTH / 2 - fontWidth, 100);
 			
 			g.drawRect(WIDTH / 4, HEIGHT - 130, WIDTH / 2, 300);
 			fontWidth = g.getFontMetrics(arial).stringWidth("Power: " + power);
@@ -477,7 +518,7 @@ public class PocketTanks implements Runnable
 			g.drawRect(3 * WIDTH / 4 + 15, HEIGHT - 100, 100, 50);
 			g.drawString(">>", 3 * WIDTH / 4 + 50, HEIGHT - 65);
 		}
-		else if(gameStarted) // We have a winner
+		else if(gameStarted) // Someone won
 		{
 			// Draw stars
 			g.setColor(Color.white);
@@ -487,17 +528,19 @@ public class PocketTanks implements Runnable
 			}
 			
 			g.setFont(arialBig);
+			String winString = tanks[gameState - 1].name + " WON";
 			if(gameState == 1)
 			{
 				g.setColor(Color.green);
+				winString = "YOU WON!";
 			}
 			else
 			{
 				g.setColor(Color.red);
 			}
 			
-			fontWidth = g.getFontMetrics(arialBig).stringWidth(tanks[gameState - 1].getName() + " WON!");
-			g.drawString(tanks[gameState - 1].getName() + " WON!", WIDTH / 2 - fontWidth / 2, 50);
+			fontWidth = g.getFontMetrics(arialBig).stringWidth(winString);
+			g.drawString(winString, WIDTH / 2 - fontWidth / 2, 50);
 			
 			fontWidth = g.getFontMetrics(arialBig).stringWidth("Click any key to restart");
 			g.drawString("Click any key to restart", WIDTH / 2 - fontWidth / 2, 90);
@@ -508,37 +551,42 @@ public class PocketTanks implements Runnable
 	{
 		if(menu == 2) // PvP game
 		{
-			if(playerName.equals(""))
+			if(playerInfo[0].equals(""))
 			{
-				playerName = "Player " + (turn + 1);
+				playerInfo[0] = "Player " + (turn + 1);
 			}
+			
 			if(turn == 0)
 			{
-				tanks[0] = new Tank(playerName, (int) (Math.random() * numberOfPoints / 4) + 3, 100, 20);
+				Tank tank = new Tank(playerInfo[0], (int) (Math.random() * numberOfPoints / 4) + 3, 20);
+				tanks[0] = tank;
 			}
 			else
 			{
-				tanks[1] = new Tank(playerName,
-						(int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3), 100, 20);
+				Tank tank = new Tank(playerInfo[0],
+						(int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3), 20);
+				tanks[1] = tank;
+				
 				gameStarted = true;
 			}
+			
 			turn = (turn + 1) % 2;
-			playerName = "";
+			playerInfo[0] = "";
 		}
 		else if(menu == 3) // LAN Game
 		{
 			if(infoCounter == 0) // player name
 			{
-				if(playerInfoLAN[0].equals(""))
+				if(playerInfo[0].equals(""))
 				{
-					playerInfoLAN[0] = "Player " + (turn + 1);
+					playerInfo[0] = "Player " + (turn + 1);
 				}
 				infoCounter++;
 			}
 			else if(infoCounter == 1) // IP
 			{
 				boolean inputError = false;
-				String ip1 = playerInfoLAN[infoCounter];
+				String ip1 = playerInfo[infoCounter];
 				
 				if(ip1.length() == 0 || ip1.length() > 15 || ip1.substring(ip1.length() - 1, ip1.length()).equals("."))
 				{
@@ -578,14 +626,14 @@ public class PocketTanks implements Runnable
 				}
 				else
 				{
-					playerInfoLAN[infoCounter] = "";
+					playerInfo[infoCounter] = "";
 					JOptionPane.showMessageDialog(null, "Wrong IP, try again");
 				}
 			}
 			else if(infoCounter == 2) // port
 			{
 				boolean inputError = false;
-				String portString = playerInfoLAN[infoCounter];
+				String portString = playerInfo[infoCounter];
 				int port1 = 0;
 				try
 				{
@@ -607,7 +655,7 @@ public class PocketTanks implements Runnable
 				}
 				else
 				{
-					playerInfoLAN[infoCounter] = "";
+					playerInfo[infoCounter] = "";
 					JOptionPane.showMessageDialog(null, "Wrong port, try again");
 				}
 			}
@@ -615,28 +663,20 @@ public class PocketTanks implements Runnable
 			// Initialize the LAN game
 			if(infoCounter == 3 && !gameStarted)
 			{
-				String ip = playerInfoLAN[1];
-				int port = Integer.parseInt(playerInfoLAN[2]);
+				String ip = playerInfo[1];
+				int port = Integer.parseInt(playerInfo[2]);
 				
 				if(!connect(ip, port))
 				{
 					initializeServer(ip, port);
 					System.out.println("Waiting for client...");
 				}
-				if(!accepted)
+				if(!joined)
 				{
 					listenForServerRequest();
 				}
 				
-				if(turn == 0) // Player 1
-				{
-					tanks[0] = new Tank(playerInfoLAN[0], (int) (Math.random() * numberOfPoints / 4) + 3, 100, 20);
-				}
-				else // Player 2
-				{
-					tanks[0] = new Tank(playerInfoLAN[0],
-							(int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3), 100, 20);
-				}
+				createTank();
 				
 				// Exchange info about tanks
 				try
@@ -657,62 +697,10 @@ public class PocketTanks implements Runnable
 					e.printStackTrace();
 				}
 				
-				// Send over the "world" so its the same on both clients
-				if(turn == 0)
-				{
-					try
-					{
-						oos.writeObject(terrain);
-						oos.writeObject(stars);
-					}
-					catch(Exception e)
-					{
-						e.printStackTrace();
-					}
-				}
-				else
-				{
-					try
-					{
-						terrain = (int[]) ois.readObject();
-						stars = (int[][]) ois.readObject();
-					}
-					catch(Exception e)
-					{
-						e.printStackTrace();
-					}
-				}
+				exchangeMapInfo();
+				
 				gameStarted = true;
 			}
-		}
-		
-	}
-	
-	public void moveTank(String dir)
-	{
-		int move = 0;
-		boolean moveCondition = false;
-		
-		if(dir.equalsIgnoreCase("left"))
-		{
-			move = -2;
-			if(tanks[turn].getIndex() > Math.abs(move))
-			{
-				moveCondition = true;
-			}
-		}
-		else if(dir.equalsIgnoreCase("right"))
-		{
-			move = 2;
-			if(tanks[turn].getIndex() < numberOfPoints - move)
-			{
-				moveCondition = true;
-			}
-		}
-		
-		if(moveCondition && !tanks[turn].getMoved())
-		{
-			tanks[turn].setIndex(tanks[turn].getIndex() + move);
 		}
 	}
 	
@@ -720,63 +708,189 @@ public class PocketTanks implements Runnable
 	{
 		if(explosion == null)
 		{
-			playSound("src/sounds/shoot.wav");
+			if(menu == 2)
+			{
+				playSound("src/sounds/shoot.wav");
+			}
 			Tank currentTank = tanks[turn];
-			return new Bullet(turn, new int[] {currentTank.getIndex() * quotient, terrain[currentTank.getIndex()] - 10},
-					currentTank.getAngle(), currentTank.getPower());
+			return new Bullet(turn, new int[] {currentTank.index * quotient, terrain[currentTank.index] - 10},
+					currentTank.angle, currentTank.power);
 		}
 		return null;
 	}
 	
 	public void changeTurn()
 	{
+		if(menu == 2)
+		{
+			tanks[turn].setMoved(false);
+		}
+		else if(menu == 3)
+		{
+			gameData.tank.setMoved(false);
+		}
 		turn = (turn + 1) % 2;
-		tanks[turn].setMoved(false);
+		gameData.turn = turn;
+	}
+	
+	public void createTank()
+	{
+		int spawn = 0;
+		if(turn == 0) // Player 1
+		{
+			spawn = (int) (Math.random() * numberOfPoints / 4) + 3;
+		}
+		else // Player 2
+		{
+			spawn = (int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3);
+		}
+		tanks[0] = new Tank(playerInfo[0], spawn, 20);
+		gameData = new GameData(tanks[0], turn);
+	}
+	
+	public void exchangeMapInfo() // Send over the "world" so its the same on both clients
+	{
+		if(turn == 0)
+		{
+			try
+			{
+				oos.writeObject(terrain);
+				oos.writeObject(stars);
+			}
+			catch(Exception e)
+			{
+				e.printStackTrace();
+			}
+		}
+		else
+		{
+			try
+			{
+				terrain = (int[]) ois.readObject();
+				stars = (int[][]) ois.readObject();
+			}
+			catch(Exception e)
+			{
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	public void restartGame()
 	{
-		gameState = 0;
-		
-		for(int i = 0; i < terrain.length; i++)
+		if(menu == 2)
 		{
-			terrain[i] = 0;
-		}
-		
-		terrain[0] = (int) (Math.random() * HEIGHT / 2 + HEIGHT / 4);
-		for(int i = quotient - 1; i < WIDTH; i += quotient)
-		{
-			terrain[i] = (int) (Math.random() * HEIGHT / 2 + HEIGHT / 4);
-		}
-		
-		for(int i = 1; i <= terrain.length - (quotient - 1); i += quotient)
-		{
-			if(terrain[i] == 0)
+			world = new World();
+			terrain = world.terrain;
+			stars = world.stars;
+			
+			for(int i = 0; i < tanks.length; i++)
 			{
-				int q = i / quotient;
-				int diff = terrain[(q + 1) * quotient - 1] - terrain[Math.max(q * quotient - 1, 0)];
-				diff = diff / quotient;
-				
-				for(int j = 0; j < quotient; j++)
+				String tankName = tanks[i].name;
+				int spawn = (int) (Math.random() * numberOfPoints / 4) + 3;
+				if(i != 0)
 				{
-					if(i + j > terrain.length - 1)
-					{
-						break;
-					}
-					terrain[i + j] = terrain[Math.max(q * quotient - 1, 0)] + j * diff;
+					spawn = (int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3);
 				}
+				tanks[i] = new Tank(tankName, spawn, 20);
 			}
 		}
-		
-		for(int i = 0; i < tanks.length; i++)
+		else if(menu == 3)
 		{
-			String tankName = tanks[i].getName();
-			int spawn = (int) (Math.random() * numberOfPoints / 4) + 3;
-			if(i != 0)
+			if(!secondPlayer)
+			{
+				turn = 0;
+				gameData.turn = turn;
+				world = new World();
+				terrain = world.terrain;
+				stars = world.stars;
+			}
+			else
+			{
+				turn = 1;
+				gameData.turn = turn;
+			}
+			
+			int spawn = 0;
+			if(turn == 0) // Player 1
+			{
+				spawn = (int) (Math.random() * numberOfPoints / 4) + 3;
+			}
+			else // Player 2
 			{
 				spawn = (int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3);
 			}
-			tanks[i] = new Tank(tankName, spawn, 100, 20);
+			gameData.tank.setNewIndex(spawn);
+			tanks[0] = gameData.tank;
+			
+			exchangeMapInfo();
+			restartedGame = true;
+		}
+		gameState = 0;
+	}
+	
+	public void getKeyInput(int key)
+	{
+		if(menu == 2)
+		{
+			if(key == 37)
+			{
+				tanks[turn].changeAngle(-1);
+			}
+			else if(key == 38)
+			{
+				tanks[turn].changePower(2);
+			}
+			else if(key == 39)
+			{
+				tanks[turn].changeAngle(1);
+			}
+			else if(key == 40)
+			{
+				tanks[turn].changePower(-2);
+			}
+			else if(key == 65)
+			{
+				tanks[turn].moveTank(-2, numberOfPoints);
+			}
+			else if(key == 68)
+			{
+				tanks[turn].moveTank(2, numberOfPoints);
+			}
+		}
+		else if(menu == 3)
+		{
+			if(key == 37)
+			{
+				// You have to change the tank object inside the object you are sending over the
+				// network for SOME reason
+				gameData.tank.changeAngle(-1);
+			}
+			else if(key == 38)
+			{
+				gameData.tank.changePower(2);
+			}
+			else if(key == 39)
+			{
+				gameData.tank.changeAngle(1);
+			}
+			else if(key == 40)
+			{
+				gameData.tank.changePower(-2);
+			}
+			else if(key == 65)
+			{
+				gameData.tank.moveTank(-2, numberOfPoints);
+			}
+			else if(key == 68)
+			{
+				gameData.tank.moveTank(2, numberOfPoints);
+			}
+		}
+		
+		if(key == 32 && bullet == null) // space
+		{
+			gameData.bullet = fire();
 		}
 	}
 	
@@ -803,7 +917,7 @@ public class PocketTanks implements Runnable
 			socket = new Socket(ip, port);
 			ois = new ObjectInputStream(socket.getInputStream());
 			oos = new ObjectOutputStream(socket.getOutputStream());
-			accepted = true;
+			joined = true;
 		}
 		catch(IOException e)
 		{
@@ -811,6 +925,7 @@ public class PocketTanks implements Runnable
 			return false;
 		}
 		turn = 1;
+		secondPlayer = true;
 		System.out.println("Connected to server!");
 		return true;
 	}
@@ -835,7 +950,7 @@ public class PocketTanks implements Runnable
 			socket = serverSocket.accept();
 			oos = new ObjectOutputStream(socket.getOutputStream());
 			ois = new ObjectInputStream(socket.getInputStream());
-			accepted = true;
+			joined = true;
 		}
 		catch(IOException e)
 		{
@@ -921,68 +1036,138 @@ public class PocketTanks implements Runnable
 			
 			if(menu == 0)
 			{
-				if(x >= WIDTH / 2 - rectWidth / 2 && x <= WIDTH / 2 - rectWidth / 2 + rectWidth)
+				if(x >= WIDTH / 2 - rectWidth / 2 && x <= WIDTH / 2 - rectWidth / 2 + rectWidth) // Check x axis
 				{
-					for(int i = 0; i < 3; i++)
+					for(int i = 0; i < 3; i++) // Determine which button user clicked
 					{
 						if(y >= rectStartY + rectDeltaY * i && y <= rectStartY + rectDeltaY * i + rectHeight)
 						{
-							menu = i + 1;
+							menu = i + 1; // Set state of the menu to corresponding button
 							break;
 						}
 					}
 				}
 			}
-			else if((menu == 2 || menu == 3) && !gameStarted)
+			else if(!gameStarted)
 			{
 				if(x >= WIDTH / 2 - 50 && x <= WIDTH / 2 + 50 && y >= 500 && y <= 575)
 				{
 					buttonOK();
 				}
 			}
-			else if(gameStarted && gameState == 0 && ((menu == 3 && turn == 0) || menu == 2))
+			else if(gameState == 0)
 			{
-				if(y >= HEIGHT - 100 && y <= HEIGHT - 50)
+				if(menu == 2)
 				{
-					if(x >= WIDTH / 4 - 115 && x <= WIDTH / 4 - 15)
+					if(y >= HEIGHT - 100 && y <= HEIGHT - 50)
 					{
-						moveTank("left");
+						if(x >= WIDTH / 4 - 115 && x <= WIDTH / 4 - 15)
+						{
+							tanks[turn].moveTank(-2, numberOfPoints);
+						}
+						else if(x >= 3 * WIDTH / 4 + 15 && x <= 3 * WIDTH / 4 + 115)
+						{
+							tanks[turn].moveTank(2, numberOfPoints);
+						}
 					}
-					else if(x >= 3 * WIDTH / 4 + 15 && x <= 3 * WIDTH / 4 + 115)
+					if(y >= HEIGHT - 95 && y <= HEIGHT - 40)
 					{
-						moveTank("right");
+						if(x >= WIDTH / 4 + 10 && x <= WIDTH / 4 + 85)
+						{
+							tanks[turn].changeAngle(-1);
+						}
+						else if(x >= WIDTH / 4 + 85 && x <= WIDTH / 4 + 140)
+						{
+							tanks[turn].changeAngle(1);
+						}
+						else if(x >= WIDTH - WIDTH / 4 - 155 && x <= WIDTH - WIDTH / 4 - 100)
+						{
+							tanks[turn].changePower(-2);
+						}
+						else if(x >= WIDTH - WIDTH / 4 - 80 && x <= WIDTH - WIDTH / 4 - 25)
+						{
+							tanks[turn].changePower(2);
+						}
 					}
 				}
-				if(y >= HEIGHT - 95 && y <= HEIGHT - 40)
+				else if(menu == 3 && turn == 0)
 				{
-					if(x >= WIDTH / 4 + 10 && x <= WIDTH / 4 + 85)
+					if(y >= HEIGHT - 100 && y <= HEIGHT - 50)
 					{
-						tanks[turn].changeAngle(-1);
+						if(x >= WIDTH / 4 - 115 && x <= WIDTH / 4 - 15)
+						{
+							gameData.tank.moveTank(-2, numberOfPoints);
+						}
+						else if(x >= 3 * WIDTH / 4 + 15 && x <= 3 * WIDTH / 4 + 115)
+						{
+							gameData.tank.moveTank(2, numberOfPoints);
+						}
 					}
-					else if(x >= WIDTH / 4 + 85 && x <= WIDTH / 4 + 140)
+					if(y >= HEIGHT - 95 && y <= HEIGHT - 40)
 					{
-						tanks[turn].changeAngle(1);
-					}
-					else if(x >= WIDTH - WIDTH / 4 - 155 && x <= WIDTH - WIDTH / 4 - 100)
-					{
-						tanks[turn].changePower(-1);
-					}
-					else if(x >= WIDTH - WIDTH / 4 - 80 && x <= WIDTH - WIDTH / 4 - 25)
-					{
-						tanks[turn].changePower(1);
+						if(x >= WIDTH / 4 + 10 && x <= WIDTH / 4 + 85)
+						{
+							gameData.tank.changeAngle(-1);
+						}
+						else if(x >= WIDTH / 4 + 85 && x <= WIDTH / 4 + 140)
+						{
+							gameData.tank.changeAngle(1);
+						}
+						else if(x >= WIDTH - WIDTH / 4 - 155 && x <= WIDTH - WIDTH / 4 - 100)
+						{
+							gameData.tank.changePower(-2);
+						}
+						else if(x >= WIDTH - WIDTH / 4 - 80 && x <= WIDTH - WIDTH / 4 - 25)
+						{
+							gameData.tank.changePower(2);
+						}
 					}
 				}
+				
 				if(y >= HEIGHT - 120 && y <= HEIGHT - 40)
 				{
 					if(x >= WIDTH / 2 - 60 && x <= WIDTH / 2 + 65 && bullet == null)
 					{
-						bullet = fire();
+						gameData.bullet = fire();
 					}
 				}
 			}
-			else if(menu == 2 && gameState != 0)
+			else if(gameState != 0)
 			{
-				restartGame(); // TODO FIX THIS FOR LAN GAME
+				restartGame();
+			}
+		}
+		
+		@Override
+		public void keyPressed(KeyEvent e)
+		{
+			int key = e.getKeyCode();
+			if(menu == 2 || menu == 3)
+			{
+				if(!gameStarted)
+				{
+					if(key == 10) // enter
+					{
+						buttonOK();
+					}
+					else if(key == 8 && playerInfo[infoCounter].length() > 0) // backspace
+					{
+						playerInfo[infoCounter] = playerInfo[infoCounter].substring(0,
+								playerInfo[infoCounter].length() - 1);
+					}
+					else
+					{
+						playerInfo[infoCounter] += e.getKeyChar();
+					}
+				}
+				else if(gameState == 0) // Game in progress
+				{
+					getKeyInput(key);
+				}
+				else if(gameState != 0)
+				{
+					restartGame();
+				}
 			}
 		}
 		
@@ -1009,82 +1194,6 @@ public class PocketTanks implements Runnable
 		@Override
 		public void keyTyped(KeyEvent e)
 		{
-		}
-		
-		@Override
-		public void keyPressed(KeyEvent e)
-		{
-			int key = e.getKeyCode();
-			if(menu == 2 && !gameStarted)
-			{
-				if(key == 10) // enter
-				{
-					buttonOK();
-				}
-				else if(key == 8 && playerName.length() > 0) // backspace
-				{
-					playerName = playerName.substring(0, playerName.length() - 1);
-				}
-				else
-				{
-					playerName += e.getKeyChar();
-				}
-			}
-			else if(menu == 3 && !gameStarted) // LAN game info input
-			{
-				if(key == 10) // enter
-				{
-					buttonOK();
-				}
-				else if(key == 8 && playerInfoLAN[infoCounter].length() > 0) // backspace
-				{
-					playerInfoLAN[infoCounter] = playerInfoLAN[infoCounter].substring(0,
-							playerInfoLAN[infoCounter].length() - 1);
-				}
-				else
-				{
-					playerInfoLAN[infoCounter] += e.getKeyChar();
-				}
-			}
-			else if(gameStarted && gameState == 0 && ((menu == 3 && turn == 0) || menu == 2))
-			{
-				if(key == 37)
-				{
-					tanks[turn].changeAngle(-1);
-				}
-				else if(key == 38)
-				{
-					tanks[turn].changePower(2);
-				}
-				else if(key == 39)
-				{
-					tanks[turn].changeAngle(1);
-				}
-				else if(key == 40)
-				{
-					tanks[turn].changePower(-2);
-				}
-				else if(key == 65)
-				{
-					moveTank("left");
-				}
-				else if(key == 68)
-				{
-					moveTank("right");
-				}
-				else if(key == 32 && bullet == null) // space
-				{
-					bullet = fire();
-				}
-//				else if(key == 82) // R
-//				{
-//					restartGame();
-//				}
-			}
-			else if(gameState != 0)
-			{
-				restartGame();
-			}
 		}
 		
 		@Override
