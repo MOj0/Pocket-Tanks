@@ -792,7 +792,6 @@ public class PocketTanks implements Runnable
 			{
 				power = tanks[turn].power + tanks[turn].explosionDiff / 100;
 			}
-			System.out.println(tanks[turn].explosionDiff);
 			explosionChanged = false;
 		}
 		return new int[] {angle, power};
