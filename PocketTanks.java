@@ -32,6 +32,8 @@ public class PocketTanks implements Runnable
 	private ObjectInputStream ois;
 	private ObjectOutputStream oos;
 	private boolean joined;
+	private int moveAmount;
+	private boolean explosionChanged;
 	
 	private int menu;
 	private Font arial;
@@ -59,6 +61,7 @@ public class PocketTanks implements Runnable
 	private World world;
 	private boolean secondPlayer;
 	private boolean restartedGame;
+	private boolean BvB; // Bot vs Bot
 	
 	public PocketTanks()
 	{
@@ -102,6 +105,9 @@ public class PocketTanks implements Runnable
 		joined = false;
 		secondPlayer = false;
 		restartedGame = false;
+		moveAmount = 4;
+		explosionChanged = false;
+		BvB = false;
 		
 		gameData = new GameData();
 		enemyGameData = new GameData();
@@ -137,13 +143,49 @@ public class PocketTanks implements Runnable
 	
 	public void tick()
 	{
-		if(menu == 2)
+		if(menu != 3)
 		{
-			// Update the local bullet and explosion, tanks[] is already local
+			// Update the local bullet and explosion, tanks[] is already local, NEEDED FOR
+			// RENDER
 			bullet = gameData.bullet;
 			explosion = gameData.explosion;
 		}
-		if(menu == 3 && gameStarted && gameState == 0) // Game in progress
+		
+		// Bot's turn
+		if(gameStarted && gameState == 0 && menu == 1 && (turn == 1 || BvB))
+		{
+			int distance = tanks[turn].index - tanks[(turn + 1) % 2].index; // Distance between player and bot
+			int dir = distance / Math.abs(distance); // 1 - player is to the LEFT, -1 - RIGHT
+			distance = Math.abs(distance);
+			int slope = terrain[tanks[turn].index + dir * 2] - terrain[tanks[turn].index]; // Slope of the terrain next
+																							// to bot
+			// Calculate average value of terrain ahead
+			int sum = 0;
+			int n = 10;
+			for(int i = 1; i < n; i++)
+			{
+				sum += (terrain[tanks[turn].index] - terrain[tanks[turn].index - i * dir]);
+			}
+			double avgTerrain = sum / n;
+			
+			// If tank has been hit or terrain is too steep, MOVE
+			if(!tanks[turn].hasMoved && (tanks[turn].wasHit || slope >= 20 || avgTerrain >= 40))
+			{
+				tanks[turn].moveTank(-dir * moveAmount, numberOfPoints);
+				tanks[turn].setHit(false);
+				tanks[turn].setAnglePower(tanks[turn].angle, 50); // reset the power to 50
+			}
+			
+			if(gameData.bullet == null && gameData.explosion == null)
+			{
+				int[] shootData = calculateAnglePower(distance, dir);
+				tanks[turn].setAnglePower(-shootData[0], shootData[1]); // for angle: just invert that shit lmao
+				gameData.bullet = fire();
+			}
+		}
+		
+		// LAN Stuff
+		if(menu == 3 && gameStarted && gameState == 0) // LAN Game
 		{
 			if(restartedGame) // Restart game procedure
 			{
@@ -224,25 +266,31 @@ public class PocketTanks implements Runnable
 			boolean collision = gameData.explosion.checkCollision(tanks[index].position[0] + tanks[index].size / 2,
 					tanks[index].position[1] + tanks[index].size / 2, tanks[index].size);
 			
+			if(menu == 1 && (turn == 1 || BvB))
+			{
+				tanks[turn].setExplosionDiff(gameData.explosion.position[0] - tanks[index].position[0]);
+				explosionChanged = true;
+			}
+			
 			if(collision)
 			{
-				if(turn == team) // Do calculations locally
+				hitText = true;
+				if(turn == team) // Do calculations locally (Local game)
 				{
+					// tanks[index] -> enemy tank
 					tanks[index].dealDamage(25);
-					if(!tanks[index].isAlive()) // If enemy tank isnt alive
+					if(!tanks[index].isAlive())
 					{
 						gameState = turn + 1;
 					}
-					hitText = true;
 				}
-				else // Do calculations on an object
+				else // Do calculations on an object (LAN)
 				{
 					gameData.tank.dealDamage(25);
 					if(!gameData.tank.isAlive())
 					{
 						gameState = turn + 1;
 					}
-					hitText = true;
 				}
 			}
 			
@@ -265,7 +313,7 @@ public class PocketTanks implements Runnable
 			{
 				gameData.explosion = new Explosion(turn, new int[] {collide * quotient - 30, terrain[collide] - 30}, 60,
 						50);
-				if(menu == 2)
+				if(menu != 3)
 				{
 					playSound("src/sounds/explosion.wav");
 				}
@@ -301,13 +349,9 @@ public class PocketTanks implements Runnable
 			g.drawRect(WIDTH / 2 - rectWidth / 2, 500, rectWidth, rectHeight);
 			g.drawString("LAN Game", WIDTH / 2 - 50, rectStartY + rectDeltaY * 2 + rectHeight / 2);
 		}
-		else if(menu == 1)
-		{
-			// TODO
-		}
 		else if(!gameStarted)
 		{
-			if(menu == 2) // PvP Game
+			if(menu != 3) // Not LAN game
 			{
 				g.setColor(Color.white);
 				
@@ -320,7 +364,7 @@ public class PocketTanks implements Runnable
 				g.drawRect(WIDTH / 2 - 50, 500, 100, 75);
 				g.drawString("OK", WIDTH / 2 - 20, 545);
 			}
-			else if(menu == 3) // LAN Game input
+			else // LAN Game input
 			{
 				g.setColor(Color.white);
 				g.setFont(arial);
@@ -425,7 +469,7 @@ public class PocketTanks implements Runnable
 			// Draw bullet
 			if(bullet != null)
 			{
-				if(menu == 2)
+				if(menu != 3)
 				{
 					if(bullet.getTeam() == 0)
 					{
@@ -436,7 +480,7 @@ public class PocketTanks implements Runnable
 						g.setColor(Color.red.darker());
 					}
 				}
-				else if(menu == 3)
+				else // LAN Game
 				{
 					if(bullet.getTeam() == turn)
 					{
@@ -549,7 +593,23 @@ public class PocketTanks implements Runnable
 	
 	public void buttonOK()
 	{
-		if(menu == 2) // PvP game
+		if(menu == 1)
+		{
+			if(playerInfo[0].equals(""))
+			{
+				playerInfo[0] = "Player " + (turn + 1);
+			}
+			// Player's tank
+			Tank tank = new Tank(playerInfo[0], (int) (Math.random() * numberOfPoints / 4) + 3, 20);
+			tanks[0] = tank;
+			
+			// Bot's tank
+			tank = new Tank("Bot", (int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3), 20);
+			tanks[1] = tank;
+			
+			gameStarted = true;
+		}
+		else if(menu == 2) // PvP game
 		{
 			if(playerInfo[0].equals(""))
 			{
@@ -698,17 +758,51 @@ public class PocketTanks implements Runnable
 				}
 				
 				exchangeMapInfo();
-				
 				gameStarted = true;
 			}
 		}
+	}
+	
+	public int[] calculateAnglePower(int distance, int dir) // TODO There is room for improvement
+	{
+		// Angle is 90 +- 30 based on where the player is, min = 60, max = 120
+		int delta = 30 * distance / numberOfPoints;
+		int angle = 90 + delta * dir;
+		int angleDifference = Math.abs(90 - angle);
+		int power = tanks[turn].power;
+		if(power == 50)
+		{
+			power = (100 + angleDifference) * distance / numberOfPoints;
+		}
+		else if(explosionChanged)
+		{
+			if(tanks[turn].explosionDiff >= 800)
+			{
+				tanks[turn].setExplosionDiff(tanks[turn].explosionDiff * -1);
+			}
+			if(Math.abs(tanks[turn].explosionDiff) < 10)
+			{
+				power = tanks[turn].power + tanks[turn].explosionDiff / 2;
+			}
+			else if(Math.abs(tanks[turn].explosionDiff) < 100)
+			{
+				power = tanks[turn].power + tanks[turn].explosionDiff / 12;
+			}
+			else
+			{
+				power = tanks[turn].power + tanks[turn].explosionDiff / 100;
+			}
+			System.out.println(tanks[turn].explosionDiff);
+			explosionChanged = false;
+		}
+		return new int[] {angle, power};
 	}
 	
 	public Bullet fire()
 	{
 		if(explosion == null)
 		{
-			if(menu == 2)
+			if(menu != 3)
 			{
 				playSound("src/sounds/shoot.wav");
 			}
@@ -721,11 +815,11 @@ public class PocketTanks implements Runnable
 	
 	public void changeTurn()
 	{
-		if(menu == 2)
+		if(menu != 3)
 		{
 			tanks[turn].setMoved(false);
 		}
-		else if(menu == 3)
+		else
 		{
 			gameData.tank.setMoved(false);
 		}
@@ -776,9 +870,25 @@ public class PocketTanks implements Runnable
 		}
 	}
 	
+	public void botVsBot()
+	{
+		world = new World();
+		terrain = world.terrain;
+		stars = world.stars;
+		
+		for(int i = 0; i < tanks.length; i++)
+		{
+			String tankName = "Bot " + (i + 1);
+			int spawn = (int) (Math.random() * numberOfPoints / 4 + (i * 3 * numberOfPoints / 4));
+			tanks[i] = new Tank(tankName, spawn, 20);
+		}
+		
+		BvB = true;
+	}
+	
 	public void restartGame()
 	{
-		if(menu == 2)
+		if(menu != 3)
 		{
 			world = new World();
 			terrain = world.terrain;
@@ -787,15 +897,15 @@ public class PocketTanks implements Runnable
 			for(int i = 0; i < tanks.length; i++)
 			{
 				String tankName = tanks[i].name;
-				int spawn = (int) (Math.random() * numberOfPoints / 4) + 3;
-				if(i != 0)
+				int spawn = (int) (Math.random() * numberOfPoints / 4 + (i * 3 * numberOfPoints / 4));
+				if(i != 0 && menu == 1)
 				{
-					spawn = (int) (Math.random() * numberOfPoints / 4 + (3 * numberOfPoints / 4) - 3);
+					tankName = "Bot";
 				}
 				tanks[i] = new Tank(tankName, spawn, 20);
 			}
 		}
-		else if(menu == 3)
+		else
 		{
 			if(!secondPlayer)
 			{
@@ -831,7 +941,7 @@ public class PocketTanks implements Runnable
 	
 	public void getKeyInput(int key)
 	{
-		if(menu == 2)
+		if(menu != 3)
 		{
 			if(key == 37)
 			{
@@ -851,11 +961,11 @@ public class PocketTanks implements Runnable
 			}
 			else if(key == 65)
 			{
-				tanks[turn].moveTank(-2, numberOfPoints);
+				tanks[turn].moveTank(-moveAmount, numberOfPoints);
 			}
 			else if(key == 68)
 			{
-				tanks[turn].moveTank(2, numberOfPoints);
+				tanks[turn].moveTank(moveAmount, numberOfPoints);
 			}
 		}
 		else if(menu == 3)
@@ -880,11 +990,11 @@ public class PocketTanks implements Runnable
 			}
 			else if(key == 65)
 			{
-				gameData.tank.moveTank(-2, numberOfPoints);
+				gameData.tank.moveTank(-moveAmount, numberOfPoints);
 			}
 			else if(key == 68)
 			{
-				gameData.tank.moveTank(2, numberOfPoints);
+				gameData.tank.moveTank(moveAmount, numberOfPoints);
 			}
 		}
 		
@@ -1063,11 +1173,11 @@ public class PocketTanks implements Runnable
 					{
 						if(x >= WIDTH / 4 - 115 && x <= WIDTH / 4 - 15)
 						{
-							tanks[turn].moveTank(-2, numberOfPoints);
+							tanks[turn].moveTank(-moveAmount, numberOfPoints);
 						}
 						else if(x >= 3 * WIDTH / 4 + 15 && x <= 3 * WIDTH / 4 + 115)
 						{
-							tanks[turn].moveTank(2, numberOfPoints);
+							tanks[turn].moveTank(moveAmount, numberOfPoints);
 						}
 					}
 					if(y >= HEIGHT - 95 && y <= HEIGHT - 40)
@@ -1096,11 +1206,11 @@ public class PocketTanks implements Runnable
 					{
 						if(x >= WIDTH / 4 - 115 && x <= WIDTH / 4 - 15)
 						{
-							gameData.tank.moveTank(-2, numberOfPoints);
+							gameData.tank.moveTank(-moveAmount, numberOfPoints);
 						}
 						else if(x >= 3 * WIDTH / 4 + 15 && x <= 3 * WIDTH / 4 + 115)
 						{
-							gameData.tank.moveTank(2, numberOfPoints);
+							gameData.tank.moveTank(moveAmount, numberOfPoints);
 						}
 					}
 					if(y >= HEIGHT - 95 && y <= HEIGHT - 40)
@@ -1142,32 +1252,41 @@ public class PocketTanks implements Runnable
 		public void keyPressed(KeyEvent e)
 		{
 			int key = e.getKeyCode();
-			if(menu == 2 || menu == 3)
+			if(!gameStarted)
 			{
-				if(!gameStarted)
+				if(key == 10) // enter
 				{
-					if(key == 10) // enter
+					buttonOK();
+				}
+				else if(key == 8 && playerInfo[infoCounter].length() > 0) // backspace
+				{
+					playerInfo[infoCounter] = playerInfo[infoCounter].substring(0,
+							playerInfo[infoCounter].length() - 1);
+				}
+				else
+				{
+					playerInfo[infoCounter] += e.getKeyChar();
+				}
+			}
+			else if(gameState == 0) // Game in progress
+			{
+				getKeyInput(key);
+				
+				if(menu == 1) // TODO Delete?
+				{
+					if(key == 82)
 					{
-						buttonOK();
+						restartGame();
 					}
-					else if(key == 8 && playerInfo[infoCounter].length() > 0) // backspace
+					else if(key == 66)
 					{
-						playerInfo[infoCounter] = playerInfo[infoCounter].substring(0,
-								playerInfo[infoCounter].length() - 1);
-					}
-					else
-					{
-						playerInfo[infoCounter] += e.getKeyChar();
+						botVsBot();
 					}
 				}
-				else if(gameState == 0) // Game in progress
-				{
-					getKeyInput(key);
-				}
-				else if(gameState != 0)
-				{
-					restartGame();
-				}
+			}
+			else if(gameState != 0)
+			{
+				restartGame();
 			}
 		}
 		

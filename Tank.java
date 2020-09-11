@@ -10,7 +10,10 @@ public class Tank implements Serializable
 	public int angle;
 	public int power;
 	public boolean hasMoved;
-	public int[] position; // Not in use, delete?
+	public int[] position;
+	// Needed for bot
+	public boolean wasHit;
+	public int explosionDiff;
 	
 	public Tank(String n, int i, int s)
 	{
@@ -22,6 +25,8 @@ public class Tank implements Serializable
 		power = 50;
 		hasMoved = false;
 		position = new int[2];
+		wasHit = false;
+		explosionDiff = 0;
 	}
 	
 	public String printData()
@@ -37,6 +42,7 @@ public class Tank implements Serializable
 	public void dealDamage(int d)
 	{
 		health -= d;
+		wasHit = true;
 	}
 	
 	public void changeAngle(int a)
@@ -47,6 +53,12 @@ public class Tank implements Serializable
 	public void changePower(int p)
 	{
 		power = Math.max(1, Math.min(power + p, 100));
+	}
+	
+	public void setAnglePower(int a, int p)
+	{
+		angle = a;
+		power = p;
 	}
 	
 	public void setHealth(int h)
@@ -62,6 +74,16 @@ public class Tank implements Serializable
 	public void setMoved(boolean m)
 	{
 		hasMoved = m;
+	}
+	
+	public void setHit(boolean h)
+	{
+		wasHit = h;
+	}
+	
+	public void setExplosionDiff(int ex)
+	{
+		explosionDiff = ex;
 	}
 	
 	public void moveTank(int dir, int max)
